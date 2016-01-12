@@ -1,13 +1,15 @@
 library('ggplot2');
 library('data.table');
 #Rules http://www.lottoreport.com/PB2015Rule.htm
-odds = 1/292201338.0
-jackpotPctRevenue = .34 #now 34% # only 32.5 pct of proceeds are contributed to the advertized jackpot 
-tax = .395+.0882
-annuity = 3/5
+odds = 1/292201338
+jackpotPctRevenue = .5*.681 #50% goes into prize pool, 68.1% of which goes to grand prize
+tax = .395+.0882 #Federal and new york state tax
+yield30Yr=.0298 #treasury yield as of 1/12/16
+annuity = 30*yield30Yr/((1+yield30Yr)^30-1) #present value multiplier for future val of 30 yr annuity
 powerplayFrac = .06 # Pct of revenue from powerplay option.estimate based on previous powerplay revenue.
-lastJackpotSeq = rev(seq(400,2000, by=100))
-jackpotAddedSeq = c(seq(0,1000, by=50))
+lastJackpotSeq = rev(seq(400,2000, by=100)) #last jackpots to calculate
+jackpotAddedSeq = c(seq(0,1000, by=50)) #added jackpots to calculate
+
 newJackpot = CJ(lastJackpot=lastJackpotSeq, jackpotAdded=jackpotAddedSeq)
 newJackpot[,jackpot:=lastJackpot+jackpotAdded]
 newJackpot[,newRevenue := jackpotAdded*annuity/(jackpotPctRevenue*(1-powerplayFrac))] # we back into the new revenue from this round by assuming the difference between the last jackpot and current is 32.5% of revenue
@@ -32,13 +34,15 @@ print(ggplot(winnerCount[winners>0 & lastJackpot==lastJackpotSeq[1]])+
 
 evDollar = winnerCount[winners>0,.(ev=sum(ev)/2), keyby=.(lastJackpot, jackpotAdded, jackpot)] #total expected value per dollar
 evDollar [,pred:=exp(jackpot*.005)]
+
+# faceted by last jackpot
 print(ggplot(evDollar[(jackpotAdded>lastJackpot*.2 | jackpotAdded>300) & jackpotAdded<lastJackpot & jackpotAdded<500])+geom_line(aes(x=jackpot, y=ev, color=lastJackpot))+facet_grid(~lastJackpot, scales="free_x")+ theme(axis.text.x = element_text(angle = 90, hjust = 1)))
 
 PreviousJackpot = factor(evDollar$lastJackpot, levels = lastJackpotSeq)
 print(ggplot(evDollar)+
         ggtitle("Powerball Expected Value Estimate")+
         geom_line(aes(x=jackpot, y=ev, color=PreviousJackpot, group=lastJackpot))+
-        geom_point(data=evDollar[(jackpotAdded>lastJackpot*.2 | jackpotAdded>300) & jackpotAdded<lastJackpot & jackpotAdded<700], aes(x=jackpot,y=ev, group=1), color='red')+
+        geom_point(data=evDollar[(jackpotAdded>jackpot*.1 | jackpotAdded>300) & jackpotAdded<lastJackpot & jackpotAdded<700], aes(x=jackpot,y=ev, group=1), color='red')+
         theme(axis.text.x = element_text(angle = 90, hjust = 1))+
         xlab("Current Jackpot (mm)")+
         ylab("Expected Value")+
